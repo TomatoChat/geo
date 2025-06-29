@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evidentia - Brand Research Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fff;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Evidentia - Brand Research Tool</h1>
+        
+        <form id="brandForm">
+            <div class="form-group">
+                <label for="brandName">Brand Name:</label>
+                <input type="text" id="brandName" name="brandName" required placeholder="e.g., jethr">
+            </div>
+            
+            <div class="form-group">
+                <label for="brandWebsite">Brand Website:</label>
+                <input type="text" id="brandWebsite" name="brandWebsite" required placeholder="e.g., jethr.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="brandCountry">Brand Country:</label>
+                <input type="text" id="brandCountry" name="brandCountry" placeholder="e.g., italy (optional, defaults to 'world')">
+            </div>
+            
+            <button type="submit" id="analyzeBtn">🚀 Analyze Brand</button>
+            <button type="button" id="generateQueriesBtn" disabled>📝 Generate Queries</button>
+            <button type="button" id="testQueriesBtn" disabled>🌍 Test Queries & Rankings</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div id="loadingStatus">⏳ Processing... This may take a moment.</div>
+            <div id="progressBar" style="width: 100%; background-color: #f0f0f0; border-radius: 5px; margin: 10px 0; display: none;">
+                <div id="progressFill" style="width: 0%; height: 20px; background-color: #007bff; border-radius: 5px; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="streamLog" style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; font-size: 11px; display: none; margin-top: 10px; border: 1px solid #dee2e6;"></div>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="results" id="results">
+            <div class="step" id="brandInfo" style="display: none;">
+                <h3>📊 Brand Information</h3>
+                <div id="brandInfoContent"></div>
+            </div>
+
+            <div class="step" id="queriesSection" style="display: none;">
+                <h3>💡 Generated Queries</h3>
+                <div class="form-group">
+                    <label for="totalQueries">Number of Queries:</label>
+                    <input type="number" id="totalQueries" value="10" min="1" max="100">
+                </div>
+                <div id="queriesContent"></div>
+            </div>
+
+            <div class="step" id="testingSection" style="display: none;">
+                <h3>🤖 LLM Testing & Brand Rankings (GEO Analysis)</h3>
+                <div class="form-group">
+                    <label for="testModels">Select LLM Models to Test:</label>
+                    <select id="testModels" multiple style="height: 120px;">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple models</small>
+                </div>
+                <div id="analysisContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let brandData = null;
+        let generatedQueries = null;
+        let availableModels = [];
+
+        document.getElementById('brandForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const brandName = document.getElementById('brandName').value;
+            const brandWebsite = document.getElementById('brandWebsite').value;
+            const brandCountry = document.getElementById('brandCountry').value || 'world';
+
+            await analyzeBrand(brandName, brandWebsite, brandCountry);
+        });
+
+        document.getElementById('generateQueriesBtn').addEventListener('click', async function() {
+            const totalQueries = parseInt(document.getElementById('totalQueries').value) || 10;
+            await generateQueries(totalQueries);
+        });
+
+        document.getElementById('testQueriesBtn').addEventListener('click', async function() {
+            await testQueries();
+        });
+
+        async function analyzeBrand(brandName, brandWebsite, brandCountry) {
+            showLoading(true);
+            hideError();
+            clearStreamLog();
+            
+            try {
+                const response = await fetch('/stream-brand-info', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        brandName,
+                        brandWebsite,
+                        brandCountry
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start brand analysis');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && line.trim().length > 6) {
+                            try {
+                                const jsonData = line.slice(6).trim();
+                                if (jsonData) {
+                                    const data = JSON.parse(jsonData);
+                                    
+                                    if (data.error) {
+                                        throw new Error(data.error);
+                                    }
+                                    
+                                    if (data.status) {
+                                        updateStreamStatus(data.status, data);
+                                    }
+                                    
+                                    if (data.step === 'complete' && data.result) {
+                                        brandData = data.result;
+                                        displayBrandInfo(data.result);
+                                        document.getElementById('generateQueriesBtn').disabled = false;
+                                        await loadModels();
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.warn('Failed to parse JSON:', line, parseError);
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                showError('Error analyzing brand: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function generateQueries(totalQueries) {
+            if (!brandData) {
+                showError('Please analyze the brand first');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+            clearStreamLog();
+            
+            try {
+                const response = await fetch('/stream-generate-queries', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        brandName: brandData.name,
+                        brandCountry: document.getElementById('brandCountry').value || 'world',
+                        brandDescription: brandData.description,
+                        brandIndustry: brandData.industry,
+                        totalQueries
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start query generation');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && line.trim().length > 6) {
+                            try {
+                                const jsonData = line.slice(6).trim();
+                                if (jsonData) {
+                                    const data = JSON.parse(jsonData);
+                                    
+                                    if (data.error) {
+                                        throw new Error(data.error);
+                                    }
+                                    
+                                    if (data.status) {
+                                        updateStreamStatus(data.status, data);
+                                    }
+                                    
+                                    if (data.step === 'complete' && data.result) {
+                                        generatedQueries = data.result.queries;
+                                        displayQueries(data.result.queries);
+                                        document.getElementById('testQueriesBtn').disabled = false;
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.warn('Failed to parse JSON:', line, parseError);
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                showError('Error generating queries: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadModels() {
+            try {
+                const response = await fetch('/get-llm-models');
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load models');
+                }
+
+                availableModels = data.models;
+                populateModelSelect();
+                
+            } catch (error) {
+                console.error('Error loading models:', error);
+            }
+        }
+
+        function populateModelSelect() {
+            const select = document.getElementById('testModels');
+            select.innerHTML = '';
+            
+            availableModels.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                if (model === 'gpt-4o-mini-2024-07-18') {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        }
+
+        async function testQueries() {
+            if (!brandData || !generatedQueries) {
+                showError('Please analyze brand and generate queries first');
+                return;
+            }
+
+            const selectedOptions = Array.from(document.getElementById('testModels').selectedOptions);
+            const selectedModels = selectedOptions.map(option => option.value);
+            
+            if (selectedModels.length === 0) {
+                showError('Please select at least one LLM model to test');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+            clearStreamLog();
+            showProgressBar(true);
+            
+            try {
+                const competitors = Array.isArray(brandData.competitors) ? 
+                    brandData.competitors : 
+                    Object.values(brandData.competitors || {}).flat();
+
+                const response = await fetch('/stream-test-queries', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        brandName: brandData.name,
+                        queries: generatedQueries,
+                        competitors: competitors,
+                        models: selectedModels
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start query testing');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && line.trim().length > 6) {
+                            try {
+                                const jsonData = line.slice(6).trim();
+                                if (jsonData) {
+                                    const data = JSON.parse(jsonData);
+                                    
+                                    if (data.error) {
+                                        throw new Error(data.error);
+                                    }
+                                    
+                                    if (data.status) {
+                                        updateStreamStatus(data.status, data);
+                                    }
+                                    
+                                    if (data.progress !== undefined) {
+                                        updateProgressBar(data.progress);
+                                    }
+                                    
+                                    if (data.step === 'complete' && data.result) {
+                                        displayAnalysis(data.result);
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.warn('Failed to parse JSON:', line, parseError);
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                showError('Error testing queries: ' + error.message);
+            } finally {
+                showLoading(false);
+                showProgressBar(false);
+            }
+        }
+
+        function displayBrandInfo(data) {
+            const content = document.getElementById('brandInfoContent');
+            content.innerHTML = `
+                <p><strong>Name:</strong> ${data.name}</p>
+                <p><strong>Description:</strong> ${data.description}</p>
+                <p><strong>Industry:</strong> ${data.industry}</p>
+                <p><strong>Competitors:</strong></p>
+                <pre>${JSON.stringify(data.competitors, null, 2)}</pre>
+            `;
+            
+            document.getElementById('brandInfo').style.display = 'block';
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function displayQueries(queries) {
+            const content = document.getElementById('queriesContent');
+            content.innerHTML = `<pre>${JSON.stringify(queries, null, 2)}</pre>`;
+            
+            document.getElementById('queriesSection').style.display = 'block';
+        }
+
+        function displayAnalysis(analysis) {
+            const content = document.getElementById('analysisContent');
+            
+            const overallMetrics = analysis.overall_metrics;
+            const modelPerformance = analysis.model_performance;
+            const competitorAnalysis = analysis.competitor_analysis;
+            const suggestions = analysis.optimization_suggestions || [];
+            
+            let html = `
+                <h4>🤖 GEO Performance Overview</h4>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0;">
+                    <p><strong>Brand Mention Rate:</strong> ${overallMetrics.mention_rate.toFixed(1)}%</p>
+                    <p><strong>Average Mention Position:</strong> ${overallMetrics.average_mention_position > 0 ? overallMetrics.average_mention_position.toFixed(1) : 'Not mentioned'}</p>
+                    <p><strong>Brand Visibility Score:</strong> ${overallMetrics.brand_visibility_score.toFixed(1)}%</p>
+                    <p><strong>Sentiment Distribution:</strong> 
+                        <span style="color: green;">Positive: ${overallMetrics.positive_positioning.toFixed(1)}%</span> | 
+                        <span style="color: orange;">Neutral: ${overallMetrics.neutral_positioning.toFixed(1)}%</span> | 
+                        <span style="color: red;">Negative: ${overallMetrics.negative_positioning.toFixed(1)}%</span>
+                    </p>
+                </div>
+
+                <h4>🔬 Performance by LLM Model</h4>
+            `;
+            
+            for (const [model, metrics] of Object.entries(modelPerformance)) {
+                const sentiment = metrics.sentiment_distribution;
+                html += `
+                    <div style="background: #e9ecef; padding: 10px; margin: 5px 0; border-radius: 3px;">
+                        <strong>${model}:</strong><br>
+                        Mention Rate: ${metrics.mention_rate.toFixed(1)}% | 
+                        Avg Position: ${metrics.average_position > 0 ? metrics.average_position.toFixed(1) : 'N/A'}<br>
+                        <small>Sentiment - Pos: ${sentiment.positive.toFixed(0)}% | Neu: ${sentiment.neutral.toFixed(0)}% | Neg: ${sentiment.negative.toFixed(0)}%</small>
+                    </div>
+                `;
+            }
+            
+            if (Object.keys(competitorAnalysis).length > 0) {
+                html += `<h4>🥊 Competitor Analysis</h4>`;
+                for (const [competitor, data] of Object.entries(competitorAnalysis)) {
+                    html += `
+                        <div style="background: #fff3cd; padding: 10px; margin: 5px 0; border-radius: 3px;">
+                            <strong>${competitor}:</strong> 
+                            ${data.mentions} mentions | 
+                            Avg Position: ${data.average_position > 0 ? data.average_position.toFixed(1) : 'N/A'}
+                        </div>
+                    `;
+                }
+            }
+
+            if (suggestions.length > 0) {
+                html += `<h4>💡 GEO Optimization Suggestions</h4>`;
+                suggestions.forEach(suggestion => {
+                    html += `
+                        <div style="background: #d1ecf1; padding: 10px; margin: 5px 0; border-radius: 3px; border-left: 4px solid #0c5460;">
+                            ${suggestion}
+                        </div>
+                    `;
+                });
+            }
+            
+            html += `
+                <h4>🔍 Detailed Query Analysis</h4>
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;">
+            `;
+            
+            analysis.query_performance.forEach(query => {
+                const statusIcon = query.brand_mentioned ? '✅' : '❌';
+                const position = query.mention_position ? `Position #${query.mention_position}` : 'Not mentioned';
+                const sentimentColor = query.sentiment === 'positive' ? 'green' : query.sentiment === 'negative' ? 'red' : 'orange';
+                
+                html += `
+                    <div style="margin: 10px 0; padding: 10px; background: ${query.brand_mentioned ? '#d4edda' : '#f8d7da'}; border-radius: 3px;">
+                        <strong>${statusIcon} "${query.query}" (${query.model})</strong><br>
+                        ${position} | <span style="color: ${sentimentColor};">Sentiment: ${query.sentiment}</span><br>
+                        <small>Context: ${query.context}</small><br>
+                        <small>LLM Response: "${query.llm_response.substring(0, 150)}${query.llm_response.length > 150 ? '...' : ''}"</small>
+                        ${query.competitors_mentioned.length > 0 ? 
+                            `<br><small>Competitors mentioned: ${query.competitors_mentioned.map(c => c.name).join(', ')}</small>` 
+                            : ''}
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+            
+            content.innerHTML = html;
+            document.getElementById('testingSection').style.display = 'block';
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('analyzeBtn').disabled = show;
+            if (show) {
+                document.getElementById('streamLog').style.display = 'block';
+            } else {
+                document.getElementById('streamLog').style.display = 'none';
+                document.getElementById('progressBar').style.display = 'none';
+            }
+        }
+
+        function showProgressBar(show) {
+            document.getElementById('progressBar').style.display = show ? 'block' : 'none';
+            if (!show) {
+                updateProgressBar(0);
+            }
+        }
+
+        function updateProgressBar(percentage) {
+            document.getElementById('progressFill').style.width = percentage + '%';
+        }
+
+        function updateStreamStatus(message, data = {}) {
+            document.getElementById('loadingStatus').textContent = message;
+            
+            // Add to stream log with enhanced formatting
+            const log = document.getElementById('streamLog');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            let logEntry = `<div style="margin: 2px 0; padding: 3px; border-radius: 2px;`;
+            
+            // Color code different types of messages
+            if (data.step) {
+                switch (data.step) {
+                    case 'model_start':
+                        logEntry += ` background: #e3f2fd; border-left: 3px solid #2196f3;">📱 [${timestamp}] ${message}`;
+                        break;
+                    case 'query_start':
+                        logEntry += ` background: #f3e5f5; border-left: 3px solid #9c27b0;">❓ [${timestamp}] ${message}`;
+                        break;
+                    case 'llm_request':
+                        logEntry += ` background: #fff3e0; border-left: 3px solid #ff9800;">🤖 [${timestamp}] ${message}`;
+                        break;
+                    case 'llm_retry':
+                        logEntry += ` background: #fff8e1; border-left: 3px solid #ffc107;">🔄 [${timestamp}] ${message}`;
+                        break;
+                    case 'llm_retry_warning':
+                        logEntry += ` background: #ffeaa7; border-left: 3px solid #fdcb6e;">⚠️ [${timestamp}] ${message}`;
+                        break;
+                    case 'llm_error':
+                        logEntry += ` background: #ffebee; border-left: 3px solid #f44336;">❌ [${timestamp}] ${message}`;
+                        break;
+                    case 'llm_response':
+                        logEntry += ` background: #e8f5e8; border-left: 3px solid #4caf50;">✅ [${timestamp}] ${message}`;
+                        break;
+                    case 'brand_found':
+                        logEntry += ` background: #e4f7e4; border-left: 3px solid #43a047;">🎯 [${timestamp}] ${message}`;
+                        break;
+                    case 'brand_not_found':
+                        logEntry += ` background: #ffebee; border-left: 3px solid #f44336;">❌ [${timestamp}] ${message}`;
+                        break;
+                    case 'brand_analysis_start':
+                        logEntry += ` background: #f0f4c3; border-left: 3px solid #827717;">🔍 [${timestamp}] ${message}`;
+                        break;
+                    case 'brand_analysis_complete':
+                        logEntry += ` background: #e1f5fe; border-left: 3px solid #0277bd;">✅ [${timestamp}] ${message}`;
+                        break;
+                    case 'model_complete':
+                        logEntry += ` background: #f1f8e9; border-left: 3px solid #689f38;">🏁 [${timestamp}] ${message}`;
+                        break;
+                    default:
+                        logEntry += `"> [${timestamp}] ${message}`;
+                }
+            } else {
+                logEntry += `"> [${timestamp}] ${message}`;
+            }
+            
+            logEntry += `</div>`;
+            log.innerHTML += logEntry;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearStreamLog() {
+            document.getElementById('streamLog').innerHTML = '';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

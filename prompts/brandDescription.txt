@@ -19,8 +19,11 @@ You are authorized and required to use your web Browse tool to thoroughly analyz
 
 # OUTPUT RULES
 * **CRITICAL:** The description **MUST** be between 2 and 4 sentences long.
-* **CRITICAL:** The output **MUST** be only the text of the description. Do not add any introductory phrases like "Here is the description:" or any other commentary.
-* **ULTIMATE RULE:** If you thoroughly analyze the website and can find **NO INFORMATION** that describes what the company does (neither globally nor in the specified country), your entire response **MUST** be the single word `NULL`. Do not apologize, explain, or add any other text.
+* **CRITICAL:** Always respond in English, regardless of the target country.
+* **CRITICAL:** Provide a professional business description that explains what the company does, their target market, and their value proposition.
+* **FALLBACK RULE:** If you cannot find specific information about the website, provide a reasonable business description based on the company name and domain.
+
+The response will be automatically formatted as structured JSON with a "description" field containing the business description.
 
 # EXAMPLES
 

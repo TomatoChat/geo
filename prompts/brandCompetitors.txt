@@ -27,16 +27,12 @@ You are authorized and required to use your web search capabilities to perform a
 5.  **Construct JSON Output:** Create a valid JSON array of objects containing the final 5 competitors according to the rules below.
 
 # OUTPUT REQUIREMENTS
-* **CRITICAL:** Your entire response **MUST** be a single, valid JSON array. Do not include any introductory text, explanations, labels, or any text before or after the JSON structure.
 * **CRITICAL:** The input company, `{companyName}`, must **NOT** be included in the competitor list.
+* **CRITICAL:** Respond in English only, regardless of the target country.
+* **CRITICAL:** Provide 3-5 competitors that are real companies with actual websites.
+* **CRITICAL:** Each competitor should have a clear business reason for competing with the target company.
 
-**JSON Structure Description:**
-Your output must be a single JSON array, which starts with an opening square bracket and ends with a closing square bracket. Inside this array, there must be exactly five JSON objects, with each object separated by a comma.
-
-Each individual JSON object represents one competitor and is a self-contained unit. Each unit must contain exactly three key-value pairs:
-1.  A key which is the string literal `"name"`, whose value is a string containing the competitor's name.
-2.  A key which is the string literal `"website"`, whose value is a string containing the competitor's full website URL.
-3.  A key which is the string literal `"reason"`, whose value is a brief string (1-2 sentences) explaining why the company is a direct competitor *in the specified country*.
-
-# EXAMPLE OF LOGIC
-To be clear, the process is to construct a standard JSON array. For the first competitor, you would construct the first JSON object containing the name, website, and reason. After that first object is complete, you must place a comma before constructing the second object for the second competitor. This pattern of a self-contained object followed by a comma repeats until the fifth and final object is constructed. No comma should follow the final object, and the entire sequence must be enclosed in the standard array brackets.
+The response will be automatically formatted as structured JSON with the following fields for each competitor:
+- "name": The competitor's company name
+- "website": The competitor's website URL (must be a valid URL)
+- "reason": A brief explanation of why they compete (1-2 sentences)
